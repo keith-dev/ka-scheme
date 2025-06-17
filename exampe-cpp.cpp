@@ -14,3 +14,12 @@ lisp> (if (> 5 3) 42 0)
 lisp> (load "myfile.lisp")
 25
 
+lisp> (define square (lambda (x) (* x x))) ; defines square
+<lambda>
+lisp> (square 5)
+25
+lisp> *   ; get last result
+25
+lisp> (list 1 2 3)
+(1 2 3)
+

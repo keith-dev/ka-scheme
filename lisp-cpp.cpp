@@ -48,6 +48,7 @@ string next_token() {
     char c;
     while (tokens.get(c)) {
         if (isspace(c)) continue;
+		if (c == ';') { tokens.ignore(numeric_limits<streamsize>::max(), '\n'); continue; }
         if (c == '(' || c == ')') return string(1, c);
         tokens.putback(c);
         tokens >> tok;
@@ -193,6 +194,16 @@ shared_ptr<Env> standard_env() {
 void repl() {
     string line;
     auto env = standard_env();
+
+	// Try to preload "stdlib.lisp" if it exists
+	ifstream stdlib("stdlib.lisp");
+	if (stdlib) {
+	    string code((istreambuf_iterator<char>(stdlib)), {});
+    	auto exprs = parse_all(code);
+	    for (auto& expr : exprs)
+	        eval(expr, env);
+	}
+
     cout << "Minimal LISP in C++ (type 'exit' to quit)" << endl;
     while (true) {
         cout << "lisp> ";
@@ -204,10 +215,17 @@ void repl() {
             auto exprs = parse_all(line);
 			for (auto& expr : exprs) {
 			    ExprPtr result = eval(expr, env);
+				(*env)["*"] = result;  // Save result to symbol '*'
 			    if (result->type == Type::Number)
-			        cout << result->number << endl;
+					print_expr(result);
+					cout << endl;
+
+			        //cout << result->number << endl;
 			    else if (result->type == Type::Symbol)
-			        cout << result->symbol << endl;
+					print_expr(result);
+					cout << endl;
+
+			        //cout << result->symbol << endl;
 			    else
 			        cout << "<expr>" << endl;
 			}
