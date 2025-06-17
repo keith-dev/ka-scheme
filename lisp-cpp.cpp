@@ -38,6 +38,7 @@ struct Expr {
 // Forward declarations
 ExprPtr eval(ExprPtr, shared_ptr<Env>);
 ExprPtr parse(const string& input);
+vector<ExprPtr> parse_all(const string& input);
 
 // Parser
 istringstream tokens;
@@ -81,6 +82,18 @@ ExprPtr parse(const string& input) {
     return read_expr();
 }
 
+vector<ExprPtr> parse_all(const string& input) {
+    tokens.clear();
+    tokens.str(input);
+    vector<ExprPtr> exprs;
+    while (tokens.peek() != EOF) {
+        while (isspace(tokens.peek())) tokens.get(); // skip whitespace
+        if (tokens.peek() == EOF) break;
+        exprs.push_back(read_expr());
+    }
+    return exprs;
+}
+
 // Evaluator
 ExprPtr eval_list(const vector<ExprPtr>& list, shared_ptr<Env> env) {
     if (list.empty()) return make_shared<Expr>(list);
@@ -101,6 +114,16 @@ ExprPtr eval_list(const vector<ExprPtr>& list, shared_ptr<Env> env) {
         for (auto& p : list[1]->list)
             params.push_back(p->symbol);
         return make_shared<Expr>(params, list[2], env);
+	} else if (op == "load") {
+        string filename = list[1]->symbol;
+        ifstream infile(filename);
+        if (!infile) throw runtime_error("Cannot open file: " + filename);
+        string code((istreambuf_iterator<char>(infile)), istreambuf_iterator<char>());
+        auto exprs = parse_all(code);
+        ExprPtr result;
+        for (auto& expr : exprs)
+            result = eval(expr, env);
+        return result;
     } else {
         ExprPtr proc = eval(list[0], env);
         vector<ExprPtr> args;
@@ -176,8 +199,18 @@ void repl() {
         if (!getline(cin, line)) break;
         if (line == "exit") break;
         try {
-            ExprPtr expr = parse(line);
-            ExprPtr result = eval(expr, env);
+            //ExprPtr expr = parse(line);
+            //ExprPtr result = eval(expr, env);
+            auto exprs = parse_all(line);
+			for (auto& expr : exprs) {
+			    ExprPtr result = eval(expr, env);
+			    if (result->type == Type::Number)
+			        cout << result->number << endl;
+			    else if (result->type == Type::Symbol)
+			        cout << result->symbol << endl;
+			    else
+			        cout << "<expr>" << endl;
+			}
             if (result->type == Type::Number)
                 cout << result->number << endl;
             else if (result->type == Type::Symbol)

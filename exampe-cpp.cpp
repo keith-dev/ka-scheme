@@ -5,3 +5,12 @@ lisp> (square 5)
 lisp> (if (> 5 3) 42 0)
 42
 
+(define x 10)
+(define y 15)
+(define sum (lambda (a b) (+ a b)))
+(sum x y)
+
+./lisp
+lisp> (load "myfile.lisp")
+25
+
