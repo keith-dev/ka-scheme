@@ -1,13 +1,14 @@
-#include <fstream>
-#include <iostream>
-#include <string>
-#include <map>
-#include <vector>
-#include <memory>
-#include <sstream>
-#include <functional>
-#include <stdexcept>
 #include <cctype>
+#include <fstream>
+#include <functional>
+#include <iostream>
+#include <limits>
+#include <map>
+#include <memory>
+#include <stdexcept>
+#include <string>
+#include <sstream>
+#include <vector>
 
 using namespace std;
 
@@ -44,21 +45,35 @@ vector<ExprPtr> parse_all(const string& input);
 // Parser
 istringstream tokens;
 
+// get next token:
+//  ( ) or space delimited text
+//  ; comment to end of line
 string next_token() {
     string tok;
     char c;
     while (tokens.get(c)) {
         if (isspace(c)) continue;
-        //if (c == ';') { tokens.ignore(numeric_limits<streamsize>::max(), '\n'); continue; }
-        if (c == ';') { std::string line; std::getline(tokens, line); continue; }
+        if (c == ';') { tokens.ignore(numeric_limits<streamsize>::max(), '\n'); continue; }
         if (c == '(' || c == ')') return string(1, c);
         tokens.putback(c);
-        tokens >> tok;
+        //tokens >> tok;
+        while (tokens.get(c)) {
+            switch (c) {
+                case '(':
+                case ')':
+                case ' ':
+                    tokens.putback(c);
+                    return tok;
+                default:
+                    tok += c;
+            }
+        }
         return tok;
     }
-    return "";
+    return {};
 }
 
+// an exmpression is a ( ) delimited set of tokens returned as an ordered set of ExpPtr
 ExprPtr read_expr() {
     string tok = next_token();
     if (tok.empty()) throw runtime_error("Unexpected EOF");
@@ -67,8 +82,11 @@ ExprPtr read_expr() {
         while (true) {
             tok = next_token();
             if (tok == ")") break;
-            //tokens.putback(' ');
-            //tokens.str(tok + tokens.str());
+            //tokens.putback(' '); // prepend the stream with the token, so we can process it recursively
+            //tokens.str(tok + tokens.str()); // does this work?
+            auto offset = tokens.tellg();
+            auto old_tokens = tokens.str().substr(offset);
+            tokens.str(tok + old_tokens);
             list.push_back(read_expr());
         }
         return make_shared<Expr>(list);
@@ -272,4 +290,3 @@ int main() {
     repl();
     return 0;
 }
-
