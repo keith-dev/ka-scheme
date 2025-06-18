@@ -1,3 +1,4 @@
+#include <fstream>
 #include <iostream>
 #include <string>
 #include <map>
@@ -48,7 +49,8 @@ string next_token() {
     char c;
     while (tokens.get(c)) {
         if (isspace(c)) continue;
-		if (c == ';') { tokens.ignore(numeric_limits<streamsize>::max(), '\n'); continue; }
+        //if (c == ';') { tokens.ignore(numeric_limits<streamsize>::max(), '\n'); continue; }
+        if (c == ';') { std::string line; std::getline(tokens, line); continue; }
         if (c == '(' || c == ')') return string(1, c);
         tokens.putback(c);
         tokens >> tok;
@@ -65,8 +67,8 @@ ExprPtr read_expr() {
         while (true) {
             tok = next_token();
             if (tok == ")") break;
-            tokens.putback(' ');
-            tokens.str(tok + tokens.str());
+            //tokens.putback(' ');
+            //tokens.str(tok + tokens.str());
             list.push_back(read_expr());
         }
         return make_shared<Expr>(list);
@@ -115,7 +117,7 @@ ExprPtr eval_list(const vector<ExprPtr>& list, shared_ptr<Env> env) {
         for (auto& p : list[1]->list)
             params.push_back(p->symbol);
         return make_shared<Expr>(params, list[2], env);
-	} else if (op == "load") {
+    } else if (op == "load") {
         string filename = list[1]->symbol;
         ifstream infile(filename);
         if (!infile) throw runtime_error("Cannot open file: " + filename);
@@ -159,6 +161,31 @@ ExprPtr eval(ExprPtr expr, shared_ptr<Env> env) {
     throw runtime_error("Unknown expression type");
 }
 
+void print_expr(ExprPtr expr) {
+    switch (expr->type) {
+        case Type::Number:
+            cout << expr->number;
+            break;
+        case Type::Symbol:
+            cout << expr->symbol;
+            break;
+        case Type::Function:
+            cout << "<builtin-function>";
+            break;
+        case Type::Lambda:
+            cout << "<lambda>";
+            break;
+        case Type::List:
+            cout << "(";
+            for (size_t i = 0; i < expr->list.size(); ++i) {
+                print_expr(expr->list[i]);
+                if (i < expr->list.size() - 1) cout << " ";
+            }
+            cout << ")";
+            break;
+    }
+}
+
 // Builtins
 shared_ptr<Env> standard_env() {
     auto env = make_shared<Env>();
@@ -195,14 +222,14 @@ void repl() {
     string line;
     auto env = standard_env();
 
-	// Try to preload "stdlib.lisp" if it exists
-	ifstream stdlib("stdlib.lisp");
-	if (stdlib) {
-	    string code((istreambuf_iterator<char>(stdlib)), {});
-    	auto exprs = parse_all(code);
-	    for (auto& expr : exprs)
-	        eval(expr, env);
-	}
+    // Try to preload "stdlib.lisp" if it exists
+    ifstream stdlib("stdlib.lisp");
+    if (stdlib) {
+        string code((istreambuf_iterator<char>(stdlib)), {});
+        auto exprs = parse_all(code);
+        for (auto& expr : exprs)
+            eval(expr, env);
+    }
 
     cout << "Minimal LISP in C++ (type 'exit' to quit)" << endl;
     while (true) {
@@ -213,28 +240,28 @@ void repl() {
             //ExprPtr expr = parse(line);
             //ExprPtr result = eval(expr, env);
             auto exprs = parse_all(line);
-			for (auto& expr : exprs) {
-			    ExprPtr result = eval(expr, env);
-				(*env)["*"] = result;  // Save result to symbol '*'
-			    if (result->type == Type::Number)
-					print_expr(result);
-					cout << endl;
-
-			        //cout << result->number << endl;
-			    else if (result->type == Type::Symbol)
-					print_expr(result);
-					cout << endl;
-
-			        //cout << result->symbol << endl;
-			    else
-			        cout << "<expr>" << endl;
-			}
+            for (auto& expr : exprs) {
+                ExprPtr result = eval(expr, env);
+                (*env)["*"] = result;  // Save result to symbol '*'
+                if (result->type == Type::Number) {
+                    print_expr(result);
+                    cout << endl;
+                    //cout << result->number << endl;
+                } else if (result->type == Type::Symbol) {
+                    print_expr(result);
+                    cout << endl;
+                    //cout << result->symbol << endl;
+                } else
+                    cout << "<expr>" << endl;
+            }
+/*
             if (result->type == Type::Number)
                 cout << result->number << endl;
             else if (result->type == Type::Symbol)
                 cout << result->symbol << endl;
             else
                 cout << "<expr>" << endl;
+ */
         } catch (exception& e) {
             cerr << "Error: " << e.what() << endl;
         }
