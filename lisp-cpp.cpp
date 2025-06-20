@@ -8,55 +8,61 @@
 #include <stdexcept>
 #include <string>
 #include <sstream>
+#include <variant>
 #include <vector>
 
-using namespace std;
-
 struct Expr;
-using ExprPtr = shared_ptr<Expr>;
-using Env = map<string, ExprPtr>;
-using BuiltinFunc = function<ExprPtr(const vector<ExprPtr>&)>;
+using ExprPtr = std::shared_ptr<Expr>;
+using List = std::vector<ExprPtr>;
+using Env = std::map<std::string, ExprPtr>;
+using BuiltinFunc = std::function<ExprPtr(const List&)>;
+struct Lambda {
+    std::vector<std::string> params;
+    ExprPtr body;
+    std::shared_ptr<Env> closure;
+};
 
 enum class Type { Number, Symbol, List, Function, Lambda };
 
 struct Expr {
     Type type;
-    double number;
-    string symbol;
-    vector<ExprPtr> list;
-    BuiltinFunc func;
-    vector<string> params;
-    ExprPtr body;
-    shared_ptr<Env> closure;
+    //std::variant<double number, std::string symbol, List list, BuiltinFunc func> data;
+    using Content = std::variant<double, std::string, List, BuiltinFunc, Lambda>;
+    Content data;
 
-    Expr(double n) : type(Type::Number), number(n) {}
-    Expr(const string& s) : type(Type::Symbol), symbol(s) {}
-    Expr(const vector<ExprPtr>& l) : type(Type::List), list(l) {}
-    Expr(BuiltinFunc f) : type(Type::Function), func(f) {}
-    Expr(const vector<string>& p, ExprPtr b, shared_ptr<Env> c)
-        : type(Type::Lambda), params(p), body(b), closure(c) {}
+    Expr(double n) : type(Type::Number), data(n) {}
+    Expr(std::string s) : type(Type::Symbol), data(std::move(s)) {}
+    Expr(List l) : type(Type::List), data(std::move(l)) {}
+    Expr(BuiltinFunc f) : type(Type::Function), data(f) {}
+    Expr(std::vector<std::string> p, ExprPtr b, std::shared_ptr<Env> c)
+        : type(Type::Lambda), data(Lambda{std::move(p), std::move(b), std::move(c)}) {}
 };
 
 // Forward declarations
-ExprPtr eval(ExprPtr, shared_ptr<Env>);
-ExprPtr parse(const string& input);
-vector<ExprPtr> parse_all(const string& input);
+ExprPtr eval(ExprPtr, std::shared_ptr<Env>);
+ExprPtr parse(const std::string& input);
+List parse_all(const std::string& input);
 
 // Parser
-istringstream tokens;
+std::istringstream tokens;
 
 // get next token:
 //  ( ) or space delimited text
 //  ; comment to end of line
-string next_token() {
-    string tok;
+std::string next_token() {
+    std::string tok;
     char c;
     while (tokens.get(c)) {
-        if (isspace(c)) continue;
-        if (c == ';') { tokens.ignore(numeric_limits<streamsize>::max(), '\n'); continue; }
-        if (c == '(' || c == ')') return string(1, c);
+        if (isspace(c))
+            continue;
+        if (c == ';') {
+            tokens.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+            continue;
+        }
+        if (c == '(' || c == ')')
+            return std::string(1, c);
+
         tokens.putback(c);
-        //tokens >> tok;
         while (tokens.get(c)) {
             switch (c) {
                 case '(':
@@ -75,71 +81,75 @@ string next_token() {
 
 // an exmpression is a ( ) delimited set of tokens returned as an ordered set of ExpPtr
 ExprPtr read_expr() {
-    string tok = next_token();
-    if (tok.empty()) throw runtime_error("Unexpected EOF");
+    std::string tok = next_token();
+    if (tok.empty())
+        throw std::runtime_error("Unexpected EOF");
     if (tok == "(") {
-        vector<ExprPtr> list;
+        List list;
         while (true) {
             tok = next_token();
             if (tok == ")") break;
-            //tokens.putback(' '); // prepend the stream with the token, so we can process it recursively
-            //tokens.str(tok + tokens.str()); // does this work?
+            // prepend the stream with the token, so we can process it recursively
             auto offset = tokens.tellg();
             auto old_tokens = tokens.str().substr(offset);
             tokens.str(tok + old_tokens);
             list.push_back(read_expr());
         }
-        return make_shared<Expr>(list);
+        return std::make_shared<Expr>(list);
     } else if (isdigit(tok[0]) || (tok[0] == '-' && tok.size() > 1)) {
-        return make_shared<Expr>(stod(tok));
+        return std::make_shared<Expr>(stod(tok));
     } else {
-        return make_shared<Expr>(tok);
+        return std::make_shared<Expr>(tok);
     }
 }
 
-ExprPtr parse(const string& input) {
+std::vector<ExprPtr> parse_all(const std::string& input) {
     tokens.clear();
     tokens.str(input);
-    return read_expr();
-}
-
-vector<ExprPtr> parse_all(const string& input) {
-    tokens.clear();
-    tokens.str(input);
-    vector<ExprPtr> exprs;
+    std::vector<ExprPtr> exprs;
     while (tokens.peek() != EOF) {
-        while (isspace(tokens.peek())) tokens.get(); // skip whitespace
-        if (tokens.peek() == EOF) break;
+        while (isspace(tokens.peek()))
+            tokens.get(); // skip whitespace
+        if (tokens.peek() == EOF)
+            break;
         exprs.push_back(read_expr());
     }
     return exprs;
 }
 
+ExprPtr parse(const std::string& input) {
+    tokens.clear();
+    tokens.str(input);
+    return read_expr();
+}
+
 // Evaluator
-ExprPtr eval_list(const vector<ExprPtr>& list, shared_ptr<Env> env) {
-    if (list.empty()) return make_shared<Expr>(list);
-    string op = list[0]->symbol;
+ExprPtr eval_list(const List& list, std::shared_ptr<Env> env) {
+    if (list.empty())
+        return std::make_shared<Expr>(list);
+    std::string op = std::get<std::string>(list[0]->data);
 
     if (op == "quote") {
         return list[1];
     } else if (op == "if") {
-        auto cond = eval(list[1], env);
-        return eval((cond->number != 0) ? list[2] : list[3], env);
+        ExprPtr cond = eval(list[1], env);
+        return eval((std::get<double>(cond->data) != 0) ? list[2] : list[3], env);
     } else if (op == "define") {
-        string var = list[1]->symbol;
+        std::string var = std::get<std::string>(list[1]->data);
         ExprPtr val = eval(list[2], env);
         (*env)[var] = val;
         return val;
     } else if (op == "lambda") {
-        vector<string> params;
-        for (auto& p : list[1]->list)
-            params.push_back(p->symbol);
-        return make_shared<Expr>(params, list[2], env);
+        std::vector<std::string> params;
+        for (auto& p : std::get<List>(list[1]->data))
+            params.push_back(std::get<std::string>(p->data));
+        return std::make_shared<Expr>(params, list[2], env);
     } else if (op == "load") {
-        string filename = list[1]->symbol;
-        ifstream infile(filename);
-        if (!infile) throw runtime_error("Cannot open file: " + filename);
-        string code((istreambuf_iterator<char>(infile)), istreambuf_iterator<char>());
+        std::string filename = std::get<std::string>(list[1]->data);
+        std::ifstream infile(filename);
+        if (!infile)
+            throw std::runtime_error("Cannot open file: " + filename);
+        std::string code((std::istreambuf_iterator<char>(infile)), std::istreambuf_iterator<char>());
         auto exprs = parse_all(code);
         ExprPtr result;
         for (auto& expr : exprs)
@@ -147,141 +157,147 @@ ExprPtr eval_list(const vector<ExprPtr>& list, shared_ptr<Env> env) {
         return result;
     } else {
         ExprPtr proc = eval(list[0], env);
-        vector<ExprPtr> args;
+        List args;
         for (size_t i = 1; i < list.size(); ++i)
             args.push_back(eval(list[i], env));
         if (proc->type == Type::Function) {
-            return proc->func(args);
+            return std::get<BuiltinFunc>(proc->data)(args);
         } else if (proc->type == Type::Lambda) {
-            auto new_env = make_shared<Env>(*proc->closure);
-            for (size_t i = 0; i < proc->params.size(); ++i)
-                (*new_env)[proc->params[i]] = args[i];
-            return eval(proc->body, new_env);
+            auto new_env = std::make_shared<Env>(*std::get<Lambda>(proc->data).closure);
+            for (size_t i = 0; i < std::get<Lambda>(proc->data).params.size(); ++i)
+                (*new_env)[std::get<Lambda>(proc->data).params[i]] = args[i];
+            return eval(std::get<Lambda>(proc->data).body, new_env);
         } else {
-            throw runtime_error("Not a function");
+            throw std::runtime_error("Not a function");
         }
     }
 }
 
-ExprPtr eval(ExprPtr expr, shared_ptr<Env> env) {
+ExprPtr eval(ExprPtr expr, std::shared_ptr<Env> env) {
     switch (expr->type) {
         case Type::Symbol:
-            if (env->count(expr->symbol))
-                return (*env)[expr->symbol];
-            throw runtime_error("Unbound symbol: " + expr->symbol);
+            if (env->count(std::get<std::string>(expr->data)))
+                return (*env)[std::get<std::string>(expr->data)];
+            throw std::runtime_error("Unbound symbol: " + std::get<std::string>(expr->data));
         case Type::Number:
         case Type::Function:
         case Type::Lambda:
             return expr;
         case Type::List:
-            return eval_list(expr->list, env);
+            return eval_list(std::get<List>(expr->data), env);
     }
-    throw runtime_error("Unknown expression type");
+    throw std::runtime_error("Unknown expression type");
 }
 
 void print_expr(ExprPtr expr) {
     switch (expr->type) {
         case Type::Number:
-            cout << expr->number;
+            std::cout << std::get<double>(expr->data);
             break;
         case Type::Symbol:
-            cout << expr->symbol;
+            std::cout << std::get<std::string>(expr->data);
             break;
         case Type::Function:
-            cout << "<builtin-function>";
+            std::cout << "<builtin-function>";
             break;
         case Type::Lambda:
-            cout << "<lambda>";
+            std::cout << "<lambda>";
             break;
         case Type::List:
-            cout << "(";
-            for (size_t i = 0; i < expr->list.size(); ++i) {
-                print_expr(expr->list[i]);
-                if (i < expr->list.size() - 1) cout << " ";
+            std::cout << "(";
+            for (size_t i = 0; i < std::get<List>(expr->data).size(); ++i) {
+                print_expr(std::get<List>(expr->data)[i]);
+                if (i < std::get<List>(expr->data).size() - 1)
+                    std::cout << " ";
             }
-            cout << ")";
+            std::cout << ")";
             break;
     }
 }
 
 // Builtins
-shared_ptr<Env> standard_env() {
-    auto env = make_shared<Env>();
-    (*env)["+"] = make_shared<Expr>([](const vector<ExprPtr>& args) {
+std::shared_ptr<Env> standard_env() {
+    auto env = std::make_shared<Env>();
+    (*env)["+"] = std::make_shared<Expr>([](const std::vector<ExprPtr>& args) {
         double sum = 0;
-        for (auto& a : args) sum += a->number;
-        return make_shared<Expr>(sum);
+        for (auto& arg : args)
+            sum += std::get<double>(arg->data);
+        return std::make_shared<Expr>(sum);
     });
-    (*env)["-"] = make_shared<Expr>([](const vector<ExprPtr>& args) {
-        double res = args[0]->number;
+    (*env)["-"] = std::make_shared<Expr>([](const std::vector<ExprPtr>& args) {
+        double res = std::get<double>(args[0]->data);
         for (size_t i = 1; i < args.size(); ++i)
-            res -= args[i]->number;
-        return make_shared<Expr>(res);
+            res -= std::get<double>(args[i]->data);
+        return std::make_shared<Expr>(res);
     });
-    (*env)["*"] = make_shared<Expr>([](const vector<ExprPtr>& args) {
+    (*env)["*"] = std::make_shared<Expr>([](const std::vector<ExprPtr>& args) {
         double res = 1;
-        for (auto& a : args) res *= a->number;
-        return make_shared<Expr>(res);
+        for (auto& arg : args)
+            res *= std::get<double>(arg->data);
+        return std::make_shared<Expr>(res);
     });
-    (*env)["/"] = make_shared<Expr>([](const vector<ExprPtr>& args) {
-        double res = args[0]->number;
+    (*env)["/"] = std::make_shared<Expr>([](const std::vector<ExprPtr>& args) {
+        double res = std::get<double>(args[0]->data);
         for (size_t i = 1; i < args.size(); ++i)
-            res /= args[i]->number;
-        return make_shared<Expr>(res);
+            res /= std::get<double>(args[i]->data);
+        return std::make_shared<Expr>(res);
     });
-    (*env)[">"] = make_shared<Expr>([](const vector<ExprPtr>& args) {
-        return make_shared<Expr>(args[0]->number > args[1]->number ? 1.0 : 0.0);
+    (*env)[">"] = std::make_shared<Expr>([](const std::vector<ExprPtr>& args) {
+        return std::make_shared<Expr>(std::get<double>(args[0]->data) > std::get<double>(args[1]->data) ? 1.0 : 0.0);
     });
     return env;
 }
 
 // REPL
 void repl() {
-    string line;
+    std::string line;
     auto env = standard_env();
 
     // Try to preload "stdlib.lisp" if it exists
-    ifstream stdlib("stdlib.lisp");
+    std::ifstream stdlib("stdlib.lisp");
     if (stdlib) {
-        string code((istreambuf_iterator<char>(stdlib)), {});
+        std::string code((std::istreambuf_iterator<char>(stdlib)), {});
         auto exprs = parse_all(code);
         for (auto& expr : exprs)
             eval(expr, env);
     }
 
-    cout << "Minimal LISP in C++ (type 'exit' to quit)" << endl;
+    std::cout << "Minimal LISP in C++ (type 'exit' to quit)" << std::endl;
     while (true) {
-        cout << "lisp> ";
-        if (!getline(cin, line)) break;
-        if (line == "exit") break;
+        std::cout << "lisp> ";
+        if (!getline(std::cin, line))
+            break;
+        if (line == "exit")
+            break;
         try {
-            //ExprPtr expr = parse(line);
-            //ExprPtr result = eval(expr, env);
+#ifdef MULTI_EXPR_PER_LINE
             auto exprs = parse_all(line);
             for (auto& expr : exprs) {
                 ExprPtr result = eval(expr, env);
                 (*env)["*"] = result;  // Save result to symbol '*'
                 if (result->type == Type::Number) {
                     print_expr(result);
-                    cout << endl;
-                    //cout << result->number << endl;
+                    std::cout << std::endl;
+                    //std::cout << result->number << endl;
                 } else if (result->type == Type::Symbol) {
                     print_expr(result);
-                    cout << endl;
-                    //cout << result->symbol << endl;
+                    std::cout << std::endl;
+                    //std::cout << result->symbol << std::endl;
                 } else
-                    cout << "<expr>" << endl;
+                    std::cout << "<expr>" << std::endl;
             }
-/*
+#else
+            ExprPtr expr = parse(line);
+            ExprPtr result = eval(expr, env);
             if (result->type == Type::Number)
-                cout << result->number << endl;
+                std::cout << std::get<double>(result->data) << std::endl;
             else if (result->type == Type::Symbol)
-                cout << result->symbol << endl;
+                std::cout << std::get<double>(result->data) << std::endl;
             else
-                cout << "<expr>" << endl;
- */
-        } catch (exception& e) {
-            cerr << "Error: " << e.what() << endl;
+                std::cout << "<expr>" << std::endl;
+#endif
+        } catch (std::exception& e) {
+            std::cerr << "Error: " << e.what() << std::endl;
         }
     }
 }
