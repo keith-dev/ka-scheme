@@ -15,7 +15,7 @@ struct Expr;
 using ExprPtr = std::shared_ptr<Expr>;
 using List = std::vector<ExprPtr>;
 using Env = std::map<std::string, ExprPtr>;
-using BuiltinFunc = std::function<ExprPtr(const List&)>;
+using Function = std::function<ExprPtr(const List&)>;
 struct Lambda {
     std::vector<std::string> params;
     ExprPtr body;
@@ -24,8 +24,8 @@ struct Lambda {
 
 enum class Type { Number, Symbol, List, Function, Lambda };
 using Number = double;
-using String = std::string;
-using ExpressionTypes = std::variant<Number, String, List, BuiltinFunc, Lambda>;
+using Symbol = std::string;
+using ExpressionTypes = std::variant<Number, Symbol, List, Function, Lambda>;
 
 struct Expr : public ExpressionTypes {
     using inherited = ExpressionTypes;
@@ -34,7 +34,7 @@ struct Expr : public ExpressionTypes {
     Expr(double n) : ExpressionTypes(n), type(Type::Number) {}
     Expr(std::string s) : ExpressionTypes(std::move(s)), type(Type::Symbol) {}
     Expr(List list) : ExpressionTypes(std::move(list)), type(Type::List) {}
-    Expr(BuiltinFunc func) : ExpressionTypes(func), type(Type::Function) {}
+    Expr(Function func) : ExpressionTypes(func), type(Type::Function) {}
     Expr(std::vector<std::string> params, ExprPtr body, std::shared_ptr<Env> closure)
         : ExpressionTypes(Lambda{std::move(params), std::move(body), std::move(closure)}), type(Type::Lambda) {}
 };
@@ -128,7 +128,7 @@ ExprPtr parse(const std::string& input) {
 ExprPtr eval_list(const List& list, std::shared_ptr<Env> env) {
     if (list.empty())
         return std::make_shared<Expr>(list);
-    std::string op = std::get<String>(*list[0]);
+    std::string op = std::get<Symbol>(*list[0]);
 
     if (op == "quote") {
         return list[1];
@@ -136,17 +136,17 @@ ExprPtr eval_list(const List& list, std::shared_ptr<Env> env) {
         ExprPtr cond = eval(list[1], env);
         return eval((std::get<Number>(*cond) != 0) ? list[2] : list[3], env);
     } else if (op == "define") {
-        std::string var = std::get<String>(*list[1]);
+        std::string var = std::get<Symbol>(*list[1]);
         ExprPtr val = eval(list[2], env);
         (*env)[var] = val;
         return val;
     } else if (op == "lambda") {
         std::vector<std::string> params;
         for (auto& param : std::get<List>(*list[1]))
-            params.push_back(std::get<String>(*param));
+            params.push_back(std::get<Symbol>(*param));
         return std::make_shared<Expr>(params, list[2], env);
     } else if (op == "load") {
-        std::string filename = std::get<String>(*list[1]);
+        std::string filename = std::get<Symbol>(*list[1]);
         std::ifstream infile(filename);
         if (!infile)
             throw std::runtime_error("Cannot open file: " + filename);
@@ -162,7 +162,7 @@ ExprPtr eval_list(const List& list, std::shared_ptr<Env> env) {
         for (size_t i = 1; i < list.size(); ++i)
             args.push_back(eval(list[i], env));
         if (proc->type == Type::Function) {
-            return std::get<BuiltinFunc>(*proc)(args);
+            return std::get<Function>(*proc)(args);
         } else if (proc->type == Type::Lambda) {
             auto new_env = std::make_shared<Env>(*std::get<Lambda>(*proc).closure);
             for (size_t i = 0; i < std::get<Lambda>(*proc).params.size(); ++i)
@@ -174,12 +174,29 @@ ExprPtr eval_list(const List& list, std::shared_ptr<Env> env) {
     }
 }
 
+template<class... Ts>
+struct overloads : Ts... { using Ts::operator()...; };
+
 ExprPtr eval(ExprPtr expr, std::shared_ptr<Env> env) {
+    const auto visitor = overloads{
+        [&](Symbol& symbol) -> ExprPtr {
+            if (env->count(symbol))
+                return (*env)[symbol];
+            throw std::runtime_error("Unbound symbol: " + symbol);
+        },
+        [&](Number&) -> ExprPtr { return expr; },
+        [&](Function&) -> ExprPtr  { return expr; },
+        [&](Lambda&) -> ExprPtr { return expr; },
+        [&](List& list) -> ExprPtr { return eval_list(list, env); }
+    };
+    return std::visit(visitor, *expr);
+
+/*
     switch (expr->type) {
         case Type::Symbol:
-            if (env->count(std::get<String>(*expr)))
-                return (*env)[std::get<String>(*expr)];
-            throw std::runtime_error("Unbound symbol: " + std::get<String>(*expr));
+            if (env->count(std::get<Symbol>(*expr)))
+                return (*env)[std::get<Symbol>(*expr)];
+            throw std::runtime_error("Unbound symbol: " + std::get<Symbol>(*expr));
         case Type::Number:
         case Type::Function:
         case Type::Lambda:
@@ -188,6 +205,7 @@ ExprPtr eval(ExprPtr expr, std::shared_ptr<Env> env) {
             return eval_list(std::get<List>(*expr), env);
     }
     throw std::runtime_error("Unknown expression type");
+ */
 }
 
 void print_expr(ExprPtr expr) {
@@ -196,7 +214,7 @@ void print_expr(ExprPtr expr) {
             std::cout << std::get<Number>(*expr);
             break;
         case Type::Symbol:
-            std::cout << std::get<String>(*expr);
+            std::cout << std::get<Symbol>(*expr);
             break;
         case Type::Function:
             std::cout << "<builtin-function>";
