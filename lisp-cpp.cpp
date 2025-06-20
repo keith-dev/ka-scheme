@@ -11,6 +11,7 @@
 #include <variant>
 #include <vector>
 
+namespace ka::common_lisp {
 struct Expr;
 using ExprPtr = std::shared_ptr<Expr>;
 using List = std::vector<ExprPtr>;
@@ -44,13 +45,27 @@ ExprPtr eval(ExprPtr, std::shared_ptr<Env>);
 ExprPtr parse(const std::string& input);
 List parse_all(const std::string& input);
 
-// Parser
-std::istringstream tokens;
+class Tokenizer {
+    // Parser
+    std::istringstream tokens;
+
+    // get next token:
+    //  ( ) or space delimited text
+    //  ; comment to end of line
+    std::string next_token();
+
+    // an exmpression is a ( ) delimited set of tokens returned as an ordered set of ExpPtr
+    ExprPtr read_expr();
+
+public:
+    std::vector<ExprPtr> parse_all(std::string input);
+    ExprPtr parse(std::string input);
+};
 
 // get next token:
 //  ( ) or space delimited text
 //  ; comment to end of line
-std::string next_token() {
+std::string Tokenizer::next_token() {
     std::string tok;
     char c;
     while (tokens.get(c)) {
@@ -81,7 +96,7 @@ std::string next_token() {
 }
 
 // an exmpression is a ( ) delimited set of tokens returned as an ordered set of ExpPtr
-ExprPtr read_expr() {
+ExprPtr Tokenizer::read_expr() {
     std::string tok = next_token();
     if (tok.empty())
         throw std::runtime_error("Unexpected EOF");
@@ -104,9 +119,9 @@ ExprPtr read_expr() {
     }
 }
 
-std::vector<ExprPtr> parse_all(const std::string& input) {
+std::vector<ExprPtr> Tokenizer::parse_all(std::string input) {
     tokens.clear();
-    tokens.str(input);
+    tokens.str(std::move(input));
     std::vector<ExprPtr> exprs;
     while (tokens.peek() != EOF) {
         while (isspace(tokens.peek()))
@@ -118,9 +133,9 @@ std::vector<ExprPtr> parse_all(const std::string& input) {
     return exprs;
 }
 
-ExprPtr parse(const std::string& input) {
+ExprPtr Tokenizer::parse(std::string input) {
     tokens.clear();
-    tokens.str(input);
+    tokens.str(std::move(input));
     return read_expr();
 }
 
@@ -151,7 +166,8 @@ ExprPtr eval_list(const List& list, std::shared_ptr<Env> env) {
         if (!infile)
             throw std::runtime_error("Cannot open file: " + filename);
         std::string code((std::istreambuf_iterator<char>(infile)), std::istreambuf_iterator<char>());
-        auto exprs = parse_all(code);
+        Tokenizer tokenizer;
+        auto exprs = tokenizer.parse_all(std::move(code));
         ExprPtr result;
         for (auto& expr : exprs)
             result = eval(expr, env);
@@ -276,7 +292,8 @@ void repl() {
     std::ifstream stdlib("stdlib.lisp");
     if (stdlib) {
         std::string code((std::istreambuf_iterator<char>(stdlib)), {});
-        auto exprs = parse_all(code);
+        Tokenizer tokenizer;
+        auto exprs = tokenizer.parse_all(std::move(code));
         for (auto& expr : exprs)
             eval(expr, env);
     }
@@ -289,8 +306,9 @@ void repl() {
         if (line == "exit")
             break;
         try {
+            Tokenizer tokenizer;
 #ifdef MULTI_EXPR_PER_LINE
-            auto exprs = parse_all(line);
+            auto exprs = tokenizer.parse_all(std::move(line));
             for (auto& expr : exprs) {
                 ExprPtr result = eval(expr, env);
                 (*env)["*"] = result;  // Save result to symbol '*'
@@ -306,7 +324,7 @@ void repl() {
                     std::cout << "<expr>" << std::endl;
             }
 #else
-            ExprPtr expr = parse(line);
+            ExprPtr expr = tokenizer.parse(std::move(line));
             ExprPtr result = eval(expr, env);
             if (result->type == Type::Number)
                 std::cout << std::get<Number>(*result) << std::endl;
@@ -320,8 +338,8 @@ void repl() {
         }
     }
 }
+}  // ka::common_lisp
 
 int main() {
-    repl();
-    return 0;
+    ka::common_lisp::repl();
 }
