@@ -7,17 +7,7 @@
 #include <memory>
 #include <vector>
 
-/*
-#include <fstream>
-#include <functional>
-#include <iostream>
-#include <map>
-#include <string>
-#include <sstream>
-#include <variant>
- */
-
-namespace ka::common_lisp {
+namespace ka::scheme {
 
 // get next token:
 //  ( ) or space delimited text
@@ -61,7 +51,8 @@ ExprPtr Tokenizer::read_expr() {
         List list;
         while (true) {
             tok = next_token();
-            if (tok == ")") break;
+            if (tok == ")")
+                break;
             // prepend the stream with the token, so we can process it recursively
             auto offset = tokens.tellg();
             auto old_tokens = tokens.str().substr(offset);
@@ -70,7 +61,7 @@ ExprPtr Tokenizer::read_expr() {
         }
         return std::make_shared<Expr>(list);
     } else if (isdigit(tok[0]) || (tok[0] == '-' && tok.size() > 1)) {
-        return std::make_shared<Expr>(stod(tok));
+        return std::make_shared<Expr>(std::stod(tok));
     } else {
         return std::make_shared<Expr>(tok);
     }
@@ -96,4 +87,4 @@ ExprPtr Tokenizer::parse(std::string input) {
     return read_expr();
 }
 
-}  // ka::common_lisp
+}  // ka::scheme

@@ -4,7 +4,7 @@
 #include <fstream>
 #include <iostream>
 
-namespace ka::common_lisp {
+namespace ka::scheme {
 
 template<class... Ts>
 struct overloads : Ts... { using Ts::operator()...; };
@@ -44,7 +44,7 @@ ExprPtr eval(ExprPtr expr, std::shared_ptr<Env> env) {
 ExprPtr eval_list(const List& list, std::shared_ptr<Env> env) {
     if (list.empty())
         return std::make_shared<Expr>(list);
-    std::string op = std::get<Symbol>(*list[0]);
+    Symbol op = std::get<Symbol>(*list[0]);
 
     if (op == "quote") {
         return list[1];
@@ -52,12 +52,12 @@ ExprPtr eval_list(const List& list, std::shared_ptr<Env> env) {
         ExprPtr cond = eval(list[1], env);
         return eval((std::get<Number>(*cond) != 0) ? list[2] : list[3], env);
     } else if (op == "define") {
-        std::string var = std::get<Symbol>(*list[1]);
+        Symbol var = std::get<Symbol>(*list[1]);
         ExprPtr val = eval(list[2], env);
         (*env)[var] = val;
         return val;
     } else if (op == "lambda") {
-        std::vector<std::string> params;
+        std::vector<Symbol> params;
         for (auto& param : std::get<List>(*list[1]))
             params.push_back(std::get<Symbol>(*param));
         return std::make_shared<Expr>(params, list[2], env);
@@ -117,4 +117,4 @@ void print_expr(ExprPtr expr) {
     }
 }
 
-}  // ka::common_lisp
+}  // ka::scheme

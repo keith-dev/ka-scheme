@@ -5,31 +5,31 @@
 #include <fstream>
 #include <iostream>
 
-namespace ka::common_lisp {
+namespace ka::scheme {
 
 // Builtins
 std::shared_ptr<Env> standard_env() {
     auto env = std::make_shared<Env>();
     (*env)["+"] = std::make_shared<Expr>([](const std::vector<ExprPtr>& args) {
-        double sum = 0;
+        Number sum{};
         for (auto& arg : args)
             sum += std::get<Number>(*arg);
         return std::make_shared<Expr>(sum);
     });
     (*env)["-"] = std::make_shared<Expr>([](const std::vector<ExprPtr>& args) {
-        double res = std::get<Number>(*args[0]);
+        Number res = std::get<Number>(*args[0]);
         for (size_t i = 1; i < args.size(); ++i)
             res -= std::get<Number>(*args[i]);
         return std::make_shared<Expr>(res);
     });
     (*env)["*"] = std::make_shared<Expr>([](const std::vector<ExprPtr>& args) {
-        double res = 1;
+        Number res = 1;
         for (auto& arg : args)
             res *= std::get<Number>(*arg);
         return std::make_shared<Expr>(res);
     });
     (*env)["/"] = std::make_shared<Expr>([](const std::vector<ExprPtr>& args) {
-        double res = std::get<Number>(*args[0]);
+        Number res = std::get<Number>(*args[0]);
         for (size_t i = 1; i < args.size(); ++i)
             res /= std::get<Number>(*args[i]);
         return std::make_shared<Expr>(res);
@@ -95,8 +95,8 @@ void repl() {
         }
     }
 }
-}  // ka::common_lisp
+}  // ka::scheme
 
 int main() {
-    ka::common_lisp::repl();
+    ka::scheme::repl();
 }

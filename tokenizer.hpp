@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 
-namespace ka::common_lisp {
+namespace ka::scheme {
 
 class Tokenizer {
     // Parser
@@ -25,4 +25,4 @@ public:
     ExprPtr parse(std::string input);
 };
 
-}  // namespace ka::common_lisp
+}  // namespace ka::scheme
