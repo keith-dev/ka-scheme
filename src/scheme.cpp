@@ -8,6 +8,11 @@
 #include <iostream> // std::cerr
 
 namespace ka::scheme {
+namespace {
+bool is_stdcout(std::ostream& cout) {
+    return &cout == &std::cout;
+}
+}  // namespace
 
 // Builtins
 std::shared_ptr<Env> standard_env() {
@@ -58,7 +63,8 @@ void repl(std::istream& cin, std::ostream& cout) {
 
     std::string line;
     while (true) {
-        cout << "lisp> ";
+        if (is_stdcout(cout))
+            cout << "lisp> ";
         if (!getline(cin, line))
             break;
         if (line == "exit")
