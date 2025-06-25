@@ -1,5 +1,8 @@
 #include "scheme.hpp"
 
+#include <iostream>
+
 int main() {
-    ka::scheme::repl();
+    std::cout << "Minimal LISP in C++ (type 'exit' to quit)" << std::endl;
+    ka::scheme::repl(std::cin, std::cout);
 }

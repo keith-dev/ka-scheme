@@ -2,7 +2,7 @@
 
 #include "fwd.hpp"
 
-#include <memory>
+#include <iosfwd>
 
 namespace ka::scheme {
 
@@ -10,6 +10,6 @@ namespace ka::scheme {
 //std::shared_ptr<Env> standard_env();
 
 // Read Evaluate Print Loop
-void repl();
+void repl(std::istream& is, std::ostream& os);
 
 }  // ka::scheme

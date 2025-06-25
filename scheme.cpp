@@ -3,7 +3,9 @@
 #include "tokenizer.hpp"
 
 #include <fstream>
-#include <iostream>
+#include <istream>
+#include <ostream>
+#include <iostream> // std::cerr
 
 namespace ka::scheme {
 
@@ -41,7 +43,7 @@ std::shared_ptr<Env> standard_env() {
 }
 
 // Read Evaluate Print Loop
-void repl() {
+void repl(std::istream& cin, std::ostream& cout) {
     auto env = standard_env();
 
     // Try to preload "stdlib.lisp" if it exists
@@ -54,11 +56,10 @@ void repl() {
             eval(expr, env);
     }
 
-    std::cout << "Minimal LISP in C++ (type 'exit' to quit)" << std::endl;
     std::string line;
     while (true) {
-        std::cout << "lisp> ";
-        if (!getline(std::cin, line))
+        cout << "lisp> ";
+        if (!getline(cin, line))
             break;
         if (line == "exit")
             break;
@@ -72,24 +73,24 @@ void repl() {
                 (*env)["*"] = result;  // Save result to symbol '*'
                 if (result->type == Type::Number) {
                     print_expr(result);
-                    std::cout << std::endl;
+                    cout << std::endl;
                     //std::cout << result->number << endl;
                 } else if (result->type == Type::Symbol) {
                     print_expr(result);
-                    std::cout << std::endl;
+                    cout << std::endl;
                     //std::cout << result->symbol << std::endl;
                 } else
-                    std::cout << "<expr>" << std::endl;
+                    cout << "<expr>" << std::endl;
             }
 #else
             ExprPtr expr = tokenizer.parse(std::move(line));
             ExprPtr result = eval(expr, env);
             if (result->type == Type::Number)
-                std::cout << std::get<Number>(*result) << std::endl;
+                cout << std::get<Number>(*result) << std::endl;
             else if (result->type == Type::Symbol)
-                std::cout << std::get<Number>(*result) << std::endl;
+                cout << std::get<Number>(*result) << std::endl;
             else
-                std::cout << "<expr>" << std::endl;
+                cout << "<expr>" << std::endl;
 #endif
         } catch (std::exception& e) {
             std::cerr << "Error: " << e.what() << std::endl;
