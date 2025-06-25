@@ -1,6 +1,6 @@
-#include "fwd.hpp"
-#include "eval.hpp"
-#include "tokenizer.hpp"
+#include "ka/scheme/fwd.hpp"
+#include "ka/scheme/eval.hpp"
+#include "ka/scheme/tokenizer.hpp"
 
 #include <fstream>
 #include <istream>
@@ -47,7 +47,7 @@ void repl(std::istream& cin, std::ostream& cout) {
     auto env = standard_env();
 
     // Try to preload "stdlib.lisp" if it exists
-    std::ifstream stdlib("stdlib.lisp");
+    std::ifstream stdlib("etc/stdlib.lisp");
     if (stdlib) {
         std::string code((std::istreambuf_iterator<char>(stdlib)), {});
         Tokenizer tokenizer;

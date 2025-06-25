@@ -1,6 +1,6 @@
 #pragma once
 
-#include "fwd.hpp"
+#include "ka/scheme/fwd.hpp"
 
 #include <sstream>
 #include <string>

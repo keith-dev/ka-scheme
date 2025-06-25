@@ -1,5 +1,5 @@
-#include "tokenizer.hpp"
-#include "eval.hpp"
+#include "ka/scheme/tokenizer.hpp"
+#include "ka/scheme/eval.hpp"
 
 #include <cctype>
 #include <limits>

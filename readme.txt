@@ -1,1 +1,0 @@
-ChatGPT generated lisp

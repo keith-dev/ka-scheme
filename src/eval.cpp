@@ -1,5 +1,5 @@
-#include "eval.hpp"
-#include "tokenizer.hpp"
+#include "ka/scheme/eval.hpp"
+#include "ka/scheme/tokenizer.hpp"
 
 #include <fstream>
 #include <iostream>
