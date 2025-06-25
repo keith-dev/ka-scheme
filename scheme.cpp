@@ -1,4 +1,4 @@
-#include "cpp-lisp-fwd.hpp"
+#include "fwd.hpp"
 #include "eval.hpp"
 #include "tokenizer.hpp"
 
@@ -40,9 +40,8 @@ std::shared_ptr<Env> standard_env() {
     return env;
 }
 
-// REPL
+// Read Evaluate Print Loop
 void repl() {
-    std::string line;
     auto env = standard_env();
 
     // Try to preload "stdlib.lisp" if it exists
@@ -56,12 +55,14 @@ void repl() {
     }
 
     std::cout << "Minimal LISP in C++ (type 'exit' to quit)" << std::endl;
+    std::string line;
     while (true) {
         std::cout << "lisp> ";
         if (!getline(std::cin, line))
             break;
         if (line == "exit")
             break;
+
         try {
             Tokenizer tokenizer;
 #ifdef MULTI_EXPR_PER_LINE
@@ -96,7 +97,3 @@ void repl() {
     }
 }
 }  // ka::scheme
-
-int main() {
-    ka::scheme::repl();
-}

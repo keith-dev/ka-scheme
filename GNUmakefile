@@ -1,5 +1,5 @@
-PROG = lisp-cpp
-SRCS = eval.cpp lisp-cpp.cpp tokenizer.cpp
+PROG = ka-scheme
+SRCS = eval.cpp scheme.cpp tokenizer.cpp main.cpp
 
 CPPFLAGS ?= -g -std=c++20 -Wall
 
