@@ -8,6 +8,11 @@
 #include <vector>
 
 namespace ka::scheme {
+namespace {
+bool is_numeric(const std::string& tok) {
+    return isdigit(tok[0]) || (tok[0] == '-' && tok.size() > 1);
+}
+}  // namespace
 
 // get next token:
 //  ( ) or space delimited text
@@ -45,6 +50,10 @@ std::string Tokenizer::next_token() {
 // an exmpression is a ( ) delimited set of tokens returned as an ordered set of ExpPtr
 ExprPtr Tokenizer::read_expr() {
     std::string tok = next_token();
+    return read_expr(std::move(tok));
+}
+
+ExprPtr Tokenizer::read_expr(std::string tok) {
     if (tok.empty())
         throw std::runtime_error("Unexpected EOF");
     if (tok == "(") {
@@ -53,24 +62,20 @@ ExprPtr Tokenizer::read_expr() {
             tok = next_token();
             if (tok == ")")
                 break;
-            // prepend the stream with the token, so we can process it recursively
-            auto offset = tokens.tellg();
-            auto old_tokens = tokens.str().substr(offset);
-            tokens.str(tok + old_tokens);
-            list.push_back(read_expr());
+            list.push_back(read_expr(std::move(tok)));
         }
         return std::make_shared<Expr>(list);
-    } else if (isdigit(tok[0]) || (tok[0] == '-' && tok.size() > 1)) {
+    } else if (is_numeric(tok)) {
         return std::make_shared<Expr>(std::stod(tok));
     } else {
-        return std::make_shared<Expr>(tok);
+        return std::make_shared<Expr>(std::move(tok));
     }
 }
 
-std::vector<ExprPtr> Tokenizer::parse_all(std::string input) {
+List Tokenizer::parse_all(std::string input) {
     tokens.clear();
     tokens.str(std::move(input));
-    std::vector<ExprPtr> exprs;
+    List exprs;
     while (tokens.peek() != EOF) {
         while (isspace(tokens.peek()))
             tokens.get(); // skip whitespace
@@ -86,5 +91,4 @@ ExprPtr Tokenizer::parse(std::string input) {
     tokens.str(std::move(input));
     return read_expr();
 }
-
 }  // ka::scheme

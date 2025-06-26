@@ -6,14 +6,12 @@
 
 namespace ka::scheme {
 
-template<class... Ts>
-struct overloads : Ts... { using Ts::operator()...; };
-
-ExprPtr eval(ExprPtr expr, std::shared_ptr<Env> env) {
-    const auto visitor = overloads{
+ExprPtr eval(ExprPtr& expr, Env& env) {
+    const auto visitor = ExprOverloads{
         [&](Symbol& symbol) -> ExprPtr {
-            if (env->count(symbol))
-                return (*env)[symbol];
+            auto iter = env.find(symbol);
+            if (iter != env.end())
+                return iter->second;
             throw std::runtime_error("Unbound symbol: " + symbol);
         },
         [&](Number&) -> ExprPtr { return expr; },
@@ -22,26 +20,10 @@ ExprPtr eval(ExprPtr expr, std::shared_ptr<Env> env) {
         [&](List& list) -> ExprPtr { return eval_list(list, env); }
     };
     return std::visit(visitor, *expr);
-
-/*
-    switch (expr->type) {
-        case Type::Symbol:
-            if (env->count(std::get<Symbol>(*expr)))
-                return (*env)[std::get<Symbol>(*expr)];
-            throw std::runtime_error("Unbound symbol: " + std::get<Symbol>(*expr));
-        case Type::Number:
-        case Type::Function:
-        case Type::Lambda:
-            return expr;
-        case Type::List:
-            return eval_list(std::get<List>(*expr), env);
-    }
-    throw std::runtime_error("Unknown expression type");
- */
 }
 
 // Evaluator
-ExprPtr eval_list(const List& list, std::shared_ptr<Env> env) {
+ExprPtr eval_list(List& list, Env& env) {
     if (list.empty())
         return std::make_shared<Expr>(list);
     Symbol op = std::get<Symbol>(*list[0]);
@@ -54,7 +36,7 @@ ExprPtr eval_list(const List& list, std::shared_ptr<Env> env) {
     } else if (op == "define") {
         Symbol var = std::get<Symbol>(*list[1]);
         ExprPtr val = eval(list[2], env);
-        (*env)[var] = val;
+        env[var] = val;
         return val;
     } else if (op == "lambda") {
         std::vector<Symbol> params;
@@ -78,43 +60,42 @@ ExprPtr eval_list(const List& list, std::shared_ptr<Env> env) {
         List args;
         for (size_t i = 1; i < list.size(); ++i)
             args.push_back(eval(list[i], env));
-        if (proc->type == Type::Function) {
-            return std::get<Function>(*proc)(args);
-        } else if (proc->type == Type::Lambda) {
-            auto new_env = std::make_shared<Env>(*std::get<Lambda>(*proc).closure);
-            for (size_t i = 0; i < std::get<Lambda>(*proc).params.size(); ++i)
-                (*new_env)[std::get<Lambda>(*proc).params[i]] = args[i];
-            return eval(std::get<Lambda>(*proc).body, new_env);
-        } else {
-            throw std::runtime_error("Not a function");
-        }
+
+        const auto visitor = ExprOverloads{
+            [&](Symbol&) -> ExprPtr { throw std::runtime_error("Symbol: Not a function"); },
+            [&](Number&) -> ExprPtr { throw std::runtime_error("Number: Not a function"); },
+            [&](Function& func) -> ExprPtr { return func(args); },
+            [&](Lambda& lambda) -> ExprPtr {
+                Env& new_env = lambda.closure;
+                for (size_t i = 0; i < lambda.params.size(); ++i)
+                    new_env[lambda.params[i]] = args[i];
+                return eval(lambda.body, new_env);
+            },
+            [&](List&) -> ExprPtr { throw std::runtime_error("List: Not a function"); }
+        };
+        return std::visit(visitor, *proc);
     }
+    throw std::runtime_error("unexpected return");
 }
 
-void print_expr(ExprPtr expr) {
-    switch (expr->type) {
-        case Type::Number:
-            std::cout << std::get<Number>(*expr);
-            break;
-        case Type::Symbol:
-            std::cout << std::get<Symbol>(*expr);
-            break;
-        case Type::Function:
-            std::cout << "<builtin-function>";
-            break;
-        case Type::Lambda:
-            std::cout << "<lambda>";
-            break;
-        case Type::List:
-            std::cout << "(";
-            for (size_t i = 0; i < std::get<List>(*expr).size(); ++i) {
-                print_expr(std::get<List>(*expr)[i]);
-                if (i < std::get<List>(*expr).size() - 1)
-                    std::cout << " ";
+std::ostream& print_expr(std::ostream& cout, ExprPtr expr) {
+    const auto visitor = ExprOverloads{
+        [&](Symbol& symbol) { cout << symbol; },
+        [&](Number& number) { cout << number; },
+        [&](Function&) { cout << "<builtin-function>"; },
+        [&](Lambda&) { cout << "<lambda>"; },
+        [&](List& list) {
+            cout << "(";
+            for (size_t i = 0; i < list.size(); ++i) {
+                print_expr(cout, list[i]);
+                if (i < list.size() - 1)
+                    cout << " ";
             }
-            std::cout << ")";
-            break;
-    }
+            cout << ")";
+        }
+    };
+    std::visit(visitor, *expr);
+    return cout;
 }
 
 }  // ka::scheme

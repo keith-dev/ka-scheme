@@ -3,6 +3,7 @@
 #include "ka/scheme/fwd.hpp"
 
 #include <functional>
+#include <iosfwd>
 #include <map>
 #include <memory>
 #include <string>
@@ -11,7 +12,6 @@
 
 namespace ka::scheme {
 
-enum class Type { Number, Symbol, List, Function, Lambda };
 using Number = long double;
 using Symbol = std::string;
 using List = std::vector<ExprPtr>;
@@ -20,24 +20,27 @@ using Env = std::map<Symbol, ExprPtr>;
 struct Lambda {
     std::vector<Symbol> params;
     ExprPtr body;
-    std::shared_ptr<Env> closure;
+    Env closure;
 };
-using ExpressionTypes = std::variant<Number, Symbol, List, Function, Lambda>;
+using ExpressionTypes = std::variant<Symbol, Number, List, Function, Lambda>;
 
 struct Expr : public ExpressionTypes {
     using inherited = ExpressionTypes;
-    Type type;
 
-    Expr(Number n) : ExpressionTypes(n), type(Type::Number) {}
-    Expr(Symbol s) : ExpressionTypes(std::move(s)), type(Type::Symbol) {}
-    Expr(List list) : ExpressionTypes(std::move(list)), type(Type::List) {}
-    Expr(Function func) : ExpressionTypes(func), type(Type::Function) {}
-    Expr(std::vector<Symbol> params, ExprPtr body, std::shared_ptr<Env> closure)
-        : ExpressionTypes(Lambda{std::move(params), std::move(body), std::move(closure)}), type(Type::Lambda) {}
+    Expr(Symbol s) noexcept : ExpressionTypes(std::move(s)) {}
+    Expr(Number n) noexcept : ExpressionTypes(n) {}
+    Expr(List list) noexcept : ExpressionTypes(std::move(list)) {}
+    Expr(Function func) noexcept : ExpressionTypes(func) {}
+    Expr(std::vector<Symbol> params, ExprPtr body, Env closure) noexcept
+        : ExpressionTypes(Lambda{std::move(params), std::move(body), std::move(closure)}) {}
 };
 
 // Forward declarations
-ExprPtr eval(ExprPtr, std::shared_ptr<Env>);
-ExprPtr eval_list(const List& list, std::shared_ptr<Env> env);
+template <class... Ts>
+struct ExprOverloads : Ts... { using Ts::operator()...; };
+
+ExprPtr eval(ExprPtr&, Env&);
+ExprPtr eval_list(List& list, Env& env);
+std::ostream& print_expr(std::ostream& cout, ExprPtr expr);
 
 }  // namespace ka::scheme

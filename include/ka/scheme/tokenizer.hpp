@@ -19,6 +19,7 @@ class Tokenizer {
 
     // an exmpression is a ( ) delimited set of tokens returned as an ordered set of ExpPtr
     ExprPtr read_expr();
+    ExprPtr read_expr(std::string token);
 
 public:
     std::vector<ExprPtr> parse_all(std::string input);
