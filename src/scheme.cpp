@@ -2,17 +2,22 @@
 #include "ka/scheme/eval.hpp"
 #include "ka/scheme/tokenizer.hpp"
 
+#include <readline/readline.h>
+#include <readline/history.h>
+
 #include <fstream>
 #include <istream>
 #include <ostream>
 #include <iostream> // std::cerr
 
+#include <string.h>
+
 namespace ka::scheme {
-namespace {
-bool is_std_cout(std::ostream& cout) {
-    return &cout == &std::cout;
-}
-}  // namespace
+//namespace {
+//bool is_std_cout(std::ostream& cout) {
+//    return &cout == &std::cout;
+//}
+//}  // namespace
 
 // Builtins
 Env standard_env() {
@@ -60,18 +65,26 @@ void repl(std::istream& cin, std::ostream& cout) {
             eval(expr, env);
     }
 
-    std::string line;
+//  std::string line;
+    std::unique_ptr<char, decltype(&::free)> buf = {nullptr, ::free};
     while (true) {
-        if (is_std_cout(cout))
-            cout << "lisp> ";
-        if (!getline(cin, line))
+        buf.reset(readline("lisp> "));
+        if (!buf)
             break;
-        if (line == "exit")
+        add_history(buf.get());
+        if (::strcmp(buf.get(), "exit") == 0)
             break;
+//      if (is_std_cout(cout))
+//          cout << "lisp> ";
+//      if (!getline(cin, line))
+//          break;
+//      if (line == "exit")
+//          break;
 
         try {
             Tokenizer tokenizer;
-            auto exprs = tokenizer.parse_all(std::move(line));
+//          auto exprs = tokenizer.parse_all(std::move(line));
+            auto exprs = tokenizer.parse_all(static_cast<const char*>(buf.get()));
             for (auto& expr : exprs) {
                 ExprPtr result = eval(expr, env);
                 //env["**"] = result;  // Save result to symbol '**'

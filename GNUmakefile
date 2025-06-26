@@ -8,7 +8,7 @@ TEST = bin/utest-ka-scheme
 TEST_SRCS = test/scheme.cpp
 
 CPPFLAGS ?= -g -std=c++20 -Iinclude -Wall
-LDADD ?= -lka-scheme
+LDADD ?= -lreadline
 
 .PROXY: clean clean-all
 
@@ -28,10 +28,10 @@ clean:
 	- rm $(SRCS:.cpp=.o)
 
 $(TEST): $(LIB) $(TEST_SRCS:.cpp=.o)
-	$(LINK.cpp) -o $@ $(TEST_SRCS:.cpp=.o) $(LIB) -lgtest -lgtest_main
+	$(LINK.cpp) -o $@ $(TEST_SRCS:.cpp=.o) $(LIB) $(LDADD) -lgtest -lgtest_main
 
 $(PROG): $(LIB) $(SRCS:.cpp=.o)
-	$(LINK.cpp) -o $@ $(SRCS:.cpp=.o) $(LIB)
+	$(LINK.cpp) -o $@ $(SRCS:.cpp=.o) $(LIB) $(LDADD)
 
 $(LIB): $(LIB_SRCS:.cpp=.o)
 	$(AR) -crsD $@ $(LIB_SRCS:.cpp=.o)
