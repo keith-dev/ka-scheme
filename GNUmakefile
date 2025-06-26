@@ -19,7 +19,9 @@ preamble:
 
 clean-all: clean
 	- rm $(LIB)
+	- rm $(TEST)
 	- rm $(PROG)
+	- rmdir lib bin
 
 clean:
 	- rm $(LIB_SRCS:.cpp=.o)
