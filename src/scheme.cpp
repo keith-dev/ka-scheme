@@ -1,18 +1,25 @@
-#include "ka/scheme/fwd.hpp"
+#include "ka/scheme/scheme.hpp"
 #include "ka/scheme/eval.hpp"
 #include "ka/scheme/tokenizer.hpp"
 
-#include "../contrib/linenoise/linenoise.h"
-
-#include <cstring>
 #include <fstream>
 #include <istream>
 #include <ostream>
-#include <iostream> // std::cerr
 
 namespace ka::scheme {
+Engine::Engine() : env_{standard_env()} {
+    // Try to preload "stdlib.lisp" if it exists
+    if (std::ifstream stdlib{"etc/stdlib.lisp"}) {
+        std::string code((std::istreambuf_iterator<char>(stdlib)), {});
+        Tokenizer tokenizer;
+        List exprs = tokenizer.parse_all(std::move(code));
+        for (auto& expr : exprs)
+            eval(expr, env_);
+    }
+}
+
 // Builtins
-Env standard_env() {
+Env Engine::standard_env() {
     Env env;
     env["+"] = std::make_shared<Expr>([](const std::vector<ExprPtr>& args) {
         Number sum{};
@@ -44,50 +51,21 @@ Env standard_env() {
     return env;
 }
 
-// Read Evaluate Print Loop
-void repl() {
-    Env env = standard_env();
+bool Engine::evaluate(std::istream& cin, std::ostream& cout, std::ostream& cerr) {
+    try {
+        std::string line((std::istreambuf_iterator<char>(cin)), {});
 
-    // Try to preload "stdlib.lisp" if it exists
-    if (std::ifstream stdlib{"etc/stdlib.lisp"}) {
-        std::string code((std::istreambuf_iterator<char>(stdlib)), {});
         Tokenizer tokenizer;
-        List exprs = tokenizer.parse_all(std::move(code));
-        for (auto& expr : exprs)
-            eval(expr, env);
-    }
-
-    using unique_malloc_ptr = std::unique_ptr<char, decltype(&::free)>;
-    unique_malloc_ptr buf = {nullptr, ::free};
-    unique_malloc_ptr last = {nullptr, ::free};
-    linenoiseHistorySetMaxLen(1000);
-    linenoiseHistoryLoad(".ka-scheme.history");
-    while (true) {
-        buf.reset(linenoise("lisp> "));
-        if (!buf.get())
-            break;
-        std::string line = buf.get();
-        if (line == "exit")
-            break;
-
-        try {
-            Tokenizer tokenizer;
-            auto exprs = tokenizer.parse_all(std::move(line));
-            for (auto& expr : exprs) {
-                ExprPtr result = eval(expr, env);
-                //env["**"] = result;  // Save result to symbol '**'
-                print_expr(std::cout, result) << std::endl;
-            }
-        } catch (std::exception& e) {
-            std::cerr << "Error: " << e.what() << std::endl;
+        auto exprs = tokenizer.parse_all(std::move(line));
+        for (auto& expr : exprs) {
+            ExprPtr result = eval(expr, env_);
+            //env["**"] = result;  // Save result to symbol '**'
+            print_expr(cout, result) << std::endl;
         }
-
-        // save history without duplicates
-        if (!last.get() || std::strcmp(last.get(), buf.get())) {
-            linenoiseHistoryAdd(buf.get());
-        }
-        std::swap(buf, last);
+        return true;
+    } catch (std::exception& e) {
+        cerr << "Error: " << e.what() << std::endl;
     }
-    linenoiseHistorySave(".ka-scheme.history");
+    return {};
 }
 }  // ka::scheme
