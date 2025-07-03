@@ -2,18 +2,15 @@
 #include "ka/scheme/eval.hpp"
 #include "ka/scheme/tokenizer.hpp"
 
+#include "../contrib/linenoise/linenoise.h"
+
+#include <cstring>
 #include <fstream>
 #include <istream>
 #include <ostream>
 #include <iostream> // std::cerr
 
 namespace ka::scheme {
-namespace {
-bool is_std_cout(std::ostream& cout) {
-    return &cout == &std::cout;
-}
-}  // namespace
-
 // Builtins
 Env standard_env() {
     Env env;
@@ -48,7 +45,7 @@ Env standard_env() {
 }
 
 // Read Evaluate Print Loop
-void repl(std::istream& cin, std::ostream& cout) {
+void repl() {
     Env env = standard_env();
 
     // Try to preload "stdlib.lisp" if it exists
@@ -60,12 +57,16 @@ void repl(std::istream& cin, std::ostream& cout) {
             eval(expr, env);
     }
 
-    std::string line;
+    using unique_malloc_ptr = std::unique_ptr<char, decltype(&::free)>;
+    unique_malloc_ptr buf = {nullptr, ::free};
+    unique_malloc_ptr last = {nullptr, ::free};
+    linenoiseHistorySetMaxLen(1000);
+    linenoiseHistoryLoad(".ka-scheme.history");
     while (true) {
-        if (is_std_cout(cout))
-            cout << "lisp> ";
-        if (!getline(cin, line))
+        buf.reset(linenoise("lisp> "));
+        if (!buf.get())
             break;
+        std::string line = buf.get();
         if (line == "exit")
             break;
 
@@ -75,11 +76,18 @@ void repl(std::istream& cin, std::ostream& cout) {
             for (auto& expr : exprs) {
                 ExprPtr result = eval(expr, env);
                 //env["**"] = result;  // Save result to symbol '**'
-                print_expr(cout, result) << std::endl;
+                print_expr(std::cout, result) << std::endl;
             }
         } catch (std::exception& e) {
             std::cerr << "Error: " << e.what() << std::endl;
         }
+
+        // save history without duplicates
+        if (!last.get() || std::strcmp(last.get(), buf.get())) {
+            linenoiseHistoryAdd(buf.get());
+        }
+        std::swap(buf, last);
     }
+    linenoiseHistorySave(".ka-scheme.history");
 }
 }  // ka::scheme

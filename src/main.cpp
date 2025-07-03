@@ -4,5 +4,5 @@
 
 int main() {
     std::cout << "Minimal LISP in C++ (type 'exit' to quit)" << std::endl;
-    ka::scheme::repl(std::cin, std::cout);
+    ka::scheme::repl();
 }

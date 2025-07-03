@@ -10,6 +10,6 @@ namespace ka::scheme {
 //std::shared_ptr<Env> standard_env();
 
 // Read Evaluate Print Loop
-void repl(std::istream& is, std::ostream& os);
+void repl();
 
 }  // ka::scheme
