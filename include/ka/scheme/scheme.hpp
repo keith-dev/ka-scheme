@@ -1,15 +1,20 @@
 #pragma once
 
-#include "ka/scheme/fwd.hpp"
+#include "ka/scheme/types.hpp"
 
 #include <iosfwd>
 
 namespace ka::scheme {
+class Engine {
+public:
+    Engine();
+    virtual ~Engine() = default;
+    virtual bool evaluate(std::istream& cin, std::ostream& cout, std::ostream& cerr);
 
-// Builtins
-//std::shared_ptr<Env> standard_env();
+protected:
+    static Env standard_env();
 
-// Read Evaluate Print Loop
-void repl();
-
+private:
+    Env env_;
+};
 }  // ka::scheme

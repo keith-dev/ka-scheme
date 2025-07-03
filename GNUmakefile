@@ -8,8 +8,8 @@ SRCS = src/main.cpp
 TEST = bin/utest-ka-scheme
 TEST_SRCS = test/scheme.cpp test/linenoise.cpp
 
-CPPFLAGS ?= -fsanitize=address -g -std=c++20 -Iinclude -Wall
-CFLAGS ?= -fsanitize=address -g -std=c11 -Iinclude
+CPPFLAGS ?= -g -std=c++20 -Iinclude -Wall
+CFLAGS ?= -g -std=c11 -Iinclude
 
 .PROXY: clean clean-all
 
