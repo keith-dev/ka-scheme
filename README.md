@@ -1,3 +1,7 @@
+# Build Status
+
+![Build Status](https://github.com/${{github.repository}}/actions/workflows/build-and-test.yml/badge.svg)
+
 # Scheme
 This project started of as an experiment with ChatGPT to generate a Common Lisp interpretter.
 
